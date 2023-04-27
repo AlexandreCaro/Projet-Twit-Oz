@@ -29,18 +29,7 @@ define
    %%%                                           | nil
    %%%                  <probability/frequence> := <int> | <float>
    fun {Press}
-      local Mots ArbreMot3 in
-         Mots = {Last2Words {InputText getText(p(1 0) 'end' $)}}
-         case Mots
-         of [Mot1 Mot2] then
-            ArbreMot3 = {Lookup Mots.2.1 {Lookup Mots.1 Data}}
-         [] _ then nil
-         end
-         case ArbreMot3
-         of notfound then nil
-         [] _ then {Prediction {Search3 ArbreMot3 nil} [nil ~1]}
-         end
-      end
+      0
    end
    
     %%% Lance les N threads de lecture et de parsing qui liront et traiteront tous les fichiers
@@ -139,13 +128,14 @@ define
         [] H|T then
             if {String.toInt {VirtualString.toString H.2.1}} > {String.toInt {VirtualString.toString Acc.2.1}} then   %%% modifiable???
                 {Prediction T H}
-            ifelse {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
-                {Prediction T {List.append Acc H}}
             else
                 {Prediction T Acc}
             end
         end
    end
+   
+              %%% ifelse {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
+              %%%  {Prediction T {List.append Acc H}}
 
    %%% Fetch Tweets Folder from CLI Arguments
    %%% See the Makefile for an example of how it is called
