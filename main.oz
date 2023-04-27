@@ -29,8 +29,18 @@ define
    %%%                                           | nil
    %%%                  <probability/frequence> := <int> | <float>
    fun {Press}
-      % TODO
-      0
+      local Mots ArbreMot3 in
+         Mots = {Last2Words {InputText getText(p(1 0) 'end' $)}}
+         case Mots
+         of [Mot1 Mot2] then
+            ArbreMot3 = {Lookup Mots.2.1 {Lookup Mots.1 Data}}
+         [] _ then nil
+         end
+         case ArbreMot3
+         of notfound then nil
+         [] _ then {Prediction {Search3 ArbreMot3 nil} [nil ~1]}
+         end
+      end
    end
    
     %%% Lance les N threads de lecture et de parsing qui liront et traiteront tous les fichiers
@@ -41,45 +51,101 @@ define
    end
    
    %%% Ajouter vos fonctions et procédures auxiliaires ici
-
-   % Comment Lire un fichier ligne par ligne:
-
-   local
-      fun {Insert N Is}
-         if N>0 then {Insert N-1 & |Is} else Is end
-      end
-      fun {ScanLine Is Tab N}
-         case Is of nil then nil
-         [] I|Ir then
-            case I
-            of &\t then M=Tab-(N mod Tab) in {Insert M {ScanLine Ir Tab M+N}}
-            [] &\b then I|{ScanLine Ir Tab {Max 0 N-1}}
-            else I|{ScanLine Ir Tab N+1}
+   
+   fun {Add Tree List}
+        case List
+        of Mot1|Mot2|Mot3|T then {Add {Add2 Tree Mot1 Mot2 Mot3} Mot2|Mot3|T}
+        [] _ then Tree
+        end
+   end
+   
+   fun {Add2 Tree Mot1 Mot2 Mot3}
+        Mot1 = {Toatom Mot1}
+        Mot2 = {Toatom Mot2}
+        Mot3 = {Toatom Mot3}
+        local Lookup1 Lookup2 Lookup3 Insert123 Insert23 Insert3 Upfreq3 in
+            Lookup1 = {Lookup Mot1 Tree}
+            case Lookup1
+            of notfound then
+                Insert123 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} leaf} Tree}
+                Insert123
+            [] tree(key:K value :V T1 T2) then
+                Lookup2 = {Lookup Mot2 Lookup1}
+                case Lookup2
+                of notfound then
+                    Insert23 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} Lookup1} Tree}
+                    Insert23
+                [] tree(key:K value :V T1 T2) then
+                    Lookup3 = {Lookup Mot3 Lookup2}
+                    case Lookup3
+                    of notfound then
+                        Insert3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 Lookup2} Lookup1} Tree}
+                        Insert3
+                    [] tree(key:K value :V T1 T2) then
+                        Upfreq3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 {String.toInt {VirtualString.toString Lookup3}}+1 Lookup2} Lookup1} Tree} %%% modifiable???
+                        Upfreq3
+                    end
+                end
             end
-         end
-      end
-      proc {Scan Tab IF OF}
-         Is={IF getS($)}
-      in
-         if Is==false then
-            {IF close} {OF close}
-         else
-            {OF putS({ScanLine Is Tab 0})}
-            {Scan Tab IF OF}
-         end
-      end
-      class TextFile
-         from Open.file Open.text
-      end
-   in
-      proc {Expand Tab IN ON}
-         {Scan Tab
-         {New TextFile init(name:IN)}
-         {New TextFile init(name:ON
-         flags:[write create truncate])}}
+        end
+   end
+   
+   fun {Toatom Word}
+        if {Atom.is Word} then Word
+        else {String.toAtom Word}
+        end
+   end
+   
+   fun {Search3 Tree Acc}
+      case Tree
+      of leaf then Acc
+      [] tree(key:K value:V T1 T2) then
+            local A B C in
+                A = {List.append Acc [K#V]}
+                B = {Search3 T1 A}
+                C = {Search3 T2 B}
+                C
+            end
       end
    end
 
+   fun {Lookup K T}
+        case T
+        of leaf then notfound
+        [] tree(key:Y value:V T1 T2) andthen K==Y then
+            found(V)
+        [] tree(key:Y value:V T1 T2) andthen K<Y then
+            {Lookup K T1}
+        [] tree(key:Y value:V T1 T2) andthen K>Y then
+            {Lookup K T2}
+        end
+   end
+
+   fun {Insert K W T}
+        case T
+        of leaf then tree(key:K value:W leaf leaf)
+        [] tree(key:Y value:V T1 T2) andthen K==Y then % Replace old value
+            tree(key:K value:W T1 T2)
+        [] tree(key:Y value:V T1 T2) andthen K<Y then
+            tree(key:Y value:V {Insert K  W T1} T2)
+        [] tree(key:Y value:V T1 T2) andthen K>Y then
+            tree(key:Y value:V T1 {Insert K W T2})
+        end
+   end
+    
+   fun {Prediction Liste Acc}
+        case Liste
+        of nil then Acc
+        [] H|T then
+            if {String.toInt {VirtualString.toString H.2.1}} > {String.toInt {VirtualString.toString Acc.2.1}} then   %%% modifiable???
+                {Prediction T H}
+            ifelse {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
+                {Prediction T {List.append Acc H}}
+            else
+                {Prediction T Acc}
+            end
+        end
+   end
 
    %%% Fetch Tweets Folder from CLI Arguments
    %%% See the Makefile for an example of how it is called
@@ -116,7 +182,7 @@ define
             % Creation de l interface graphique
 	 Description=td(
 			title: "Text predictor"
-			lr(text(handle:InputText width:50 height:10 background:white foreground:black wrap:word) button(text:"Predict" width:15 action:Press))
+			lr(text(handle:InputText width:50 height:10 background:blue foreground:white wrap:word) button(text:"Predict" width:15 action:Press))
 			text(handle:OutputText width:50 height:10 background:black foreground:white glue:w wrap:word)
 			action:proc{$}{Application.exit 0} end % quitte le programme quand la fenetre est fermee
 			)
