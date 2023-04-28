@@ -128,14 +128,20 @@ define
         [] H|T then
             if {String.toInt {VirtualString.toString H.2.1}} > {String.toInt {VirtualString.toString Acc.2.1}} then   %%% modifiable???
                 {Prediction T H}
+            elseif {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
+                {Prediction T [{List.append Acc.1 [H.1]} H.2.1]}                                                        %%% verifier que ca fonctionne
             else
                 {Prediction T Acc}
             end
         end
    end
    
-              %%% ifelse {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
-              %%%  {Prediction T {List.append Acc H}}
+   fun {GetLastMots Phrase}
+        case Phrase of nil then nil
+        [] Mot1|Mot2|nil then Mot1|Mot2
+        [] H|T then {GetLastMots T}
+        end
+   end
 
    %%% Fetch Tweets Folder from CLI Arguments
    %%% See the Makefile for an example of how it is called
