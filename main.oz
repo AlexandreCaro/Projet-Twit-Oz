@@ -40,6 +40,51 @@ define
    end
    
    %%% Ajouter vos fonctions et procédures auxiliaires ici
+
+   proc {SeparerLigne Phrase ?R}
+      local Fonction
+      in
+      fun {Fonction Chaine Liste Mots}
+         case Chaine
+         of nil then
+            if Mots==nil then Liste else {Append Liste [Mots]} end
+         [] Head|Tail then
+            case {Char.type Head}
+            of lower then {Fonction Tail Liste {Append Mots [Head]}}
+            [] upper then {Fonction Tail Liste {Append Mots [Char.toLower Head]}}
+            [] digit then {Fonction Tail Liste {Append Mots [Head]}}
+            else
+               if Mots==nil then {Fonction Tail Liste nil}
+               else {Fonction Tail {Append Liste [Mots]} nil}
+               end
+            end
+         else
+            nil
+         end
+      end
+   in
+      R={Fonction Phrase nil nil}
+   end
+
+   proc {Scan Tab NbeLigne}
+      Is={IF getS($)}
+   in
+      if Is==false then
+         {IF close} none
+      else
+         if NbeLigne==1 then
+            {IF close}
+            Line
+         else
+            {Scan Tab NbeLigne-1}
+         end
+      end
+   end
+
+   fun {PrendreLigneN NbeFichier NbeLigne DossierTweet Fichier}
+      {Scan {New FichierTexte init(nom: DossierTweet#"/"#{List.nth Fichier NbeFichier})} NbeLigne}
+   end
+
    
    fun {Add Tree List}
         case List
