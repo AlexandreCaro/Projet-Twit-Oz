@@ -8,10 +8,16 @@ import
    Property
    Browser
 define
+   %% Variables globales
+   Data Tree
+
    %%% Pour ouvrir les fichiers
    class TextFile
       from Open.file Open.text
    end
+
+
+
 
    proc {Browse Buf}
       {Browser.browse Buf}
@@ -36,8 +42,10 @@ define
     %%% Les threads de parsing envoient leur resultat au port Port
    proc {LaunchThreads Port N}
         % TODO
-        %% Slide 44 page 22 Cours 8-9
-        %% Prod est la fonction Reading et Disp est la fonction Parsing
+        
+        thread Data={Reading ListFiles} end
+        thread {Parsing Data Port} end
+        thread {CreerArbre Port N} end
       skip
    end
    
@@ -134,7 +142,26 @@ define
             end
         end
    end
-   
+
+   %% Procédure permettant de créer un arbre à travers le parsing
+
+   proc {CreerArbre Source NThreads ?Resultat}
+      fun{Fonction Source Arbre NThreads Finis}
+         case S
+         of Head|Tail then
+            if Head==done then
+               if Finis/=NThreads then {Fonction Tail Arbre NThreads Finis+1}
+               elseif Finis==NThreads then Arbre
+               end
+            else
+               {Fonction Tail {Add2 Arbre Head} NThreads Finis}
+            end
+         end
+      end
+   in
+      R={Fonction Source Tree NThreads-1 0}
+   end
+      
    fun {Toatom Word}
         if {Atom.is Word} then Word
         else {String.toAtom Word}
@@ -256,3 +283,4 @@ define
    end
     % Appelle la procedure principale
    {Main}
+end
