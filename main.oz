@@ -149,17 +149,17 @@ define
       fun{Fonction Source Arbre NThreads Finis}
          case S
          of Head|Tail then
-            if Head==done then
-               if Finis/=NThreads then {Fonction Tail Arbre NThreads Finis+1}
+            if Head/=done then
+               {Fonction Tail {Add2 Arbre Head} NThreads Finis}
+            else
+               if Finis/= NThreads then {Fonction Tail Arbre NThreads Finis+1}
                elseif Finis==NThreads then Arbre
                end
-            else
-               {Fonction Tail {Add2 Arbre Head} NThreads Finis}
             end
          end
       end
    in
-      R={Fonction Source Tree NThreads-1 0}
+      Resultat={Fonction Source Tree NThreads-1 0}
    end
       
    fun {Toatom Word}
