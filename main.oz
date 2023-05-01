@@ -36,6 +36,8 @@ define
     %%% Les threads de parsing envoient leur resultat au port Port
    proc {LaunchThreads Port N}
         % TODO
+        %% Slide 44 page 22 Cours 8-9
+        %% Prod est la fonction Reading et Disp est la fonction Parsing
       skip
    end
    
@@ -66,18 +68,27 @@ define
       R={Fonction Phrase nil nil}
    end
 
-   proc {Scan Tab NbeLigne}
-      Is={IF getS($)}
-   in
-      if Is==false then
-         {IF close} none
-      else
-         if NbeLigne==1 then
-            {IF close}
-            Line
-         else
-            {Scan Tab NbeLigne-1}
-         end
+   fun {Scan Fichier}
+      local Ligne in
+          Ligne = {Fichier getS($)}
+          if Ligne == false then
+              {Fichier close}
+              nil
+          else
+              Ligne|{Scan Fichier}
+          end
+      end
+ end
+
+   fun {Reading ListFiles}
+      case ListFiles of nil then nil
+      [] H|T then {Scan H}|{Reading T}
+      end
+   end
+
+   proc {Parsing String Port}
+      case String of nil then nil
+      [] H|T then {Send Port {SeparerLigne H}} {Parsing T Port}
       end
    end
 
@@ -245,4 +256,3 @@ define
    end
     % Appelle la procedure principale
    {Main}
-end
