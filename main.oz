@@ -57,15 +57,15 @@ define
       fun {Fonction Chaine Liste Mots}
          case Chaine
          of nil then
-            if Mots==nil then Liste else {Append Liste [Mots]} end
+            if Mots/=nil then {Append Liste [Mots]} else Liste end
          [] Head|Tail then
             case {Char.type Head}
-            of lower then {Fonction Tail Liste {Append Mots [Head]}}
+            of digit then {Fonction Tail Liste {Append Mots [Head]}}
             [] upper then {Fonction Tail Liste {Append Mots [Char.toLower Head]}}
-            [] digit then {Fonction Tail Liste {Append Mots [Head]}}
+            [] lower then {Fonction Tail Liste {Append Mots [Head]}}
             else
-               if Mots==nil then {Fonction Tail Liste nil}
-               else {Fonction Tail {Append Liste [Mots]} nil}
+               if Mots/=nil then {Fonction Tail {Append Liste [Mots]} nil}
+               else {Fonction Tail Liste nil}
                end
             end
          else
