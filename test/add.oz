@@ -13,22 +13,22 @@ declare
         local Lookup1 Lookup2 Lookup3 Insert123 Insert23 Insert3 Upfreq3 in
             Lookup1 = {Lookup Mot1 Tree}
             case Lookup1
-            of notfound then
+            of leaf then
                 Insert123 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} leaf} Tree}
                 Insert123
             [] tree(key:K value :V T1 T2) then
                 Lookup2 = {Lookup Mot2 Lookup1}
                 case Lookup2
-                of notfound then
+                of leaf then
                     Insert23 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} Lookup1} Tree}
                     Insert23
                 [] tree(key:K value :V T1 T2) then
                     Lookup3 = {Lookup Mot3 Lookup2}
                     case Lookup3
-                    of notfound then
+                    of leaf then
                         Insert3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 Lookup2} Lookup1} Tree}
                         Insert3
-                    [] tree(key:K value :V T1 T2) then
+                    [] _ then
                         Upfreq3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 {String.toInt {VirtualString.toString Lookup3}}+1 Lookup2} Lookup1} Tree} %%% modifiable???
                         Upfreq3
                     end
@@ -58,7 +58,7 @@ declare
 
    fun {Lookup K T}
         case T
-        of leaf then notfound
+        of leaf then leaf
         [] tree(key:Y value:V T1 T2) andthen K==Y then
             V
         [] tree(key:Y value:V T1 T2) andthen K<Y then
