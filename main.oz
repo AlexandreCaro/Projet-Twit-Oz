@@ -8,16 +8,16 @@ import
    Property
    Browser
 define
-   %% Variables globales
-   Data Tree
-
+   Arbre
+   TweetsFolder
+   InputText
+   OutputText
+   
+   
    %%% Pour ouvrir les fichiers
    class TextFile
       from Open.file Open.text
    end
-
-
-
 
    proc {Browse Buf}
       {Browser.browse Buf}
@@ -35,37 +35,64 @@ define
    %%%                                           | nil
    %%%                  <probability/frequence> := <int> | <float>
    fun {Press}
-      0
+      local Var Predic in
+         Var = {GetLastMots {InputText getText(p(1 0) 'end' $)}}
+         case Var
+         of [Word NextWord] then
+            Predic = {Lookup NextWord {Lookup Word Arbre}}
+         [] _ then Predic = leaf
+         end
+         case Predic
+         of leaf then [[nil] 0]
+         [] _ then
+            local R in
+               R = {Prediction {Search3 Predic nil} [nil 0]}
+               [{List.map R.1 VirtualString.toAtom} R.2.1]
+            end
+         end
+      end
    end
+
    
     %%% Lance les N threads de lecture et de parsing qui liront et traiteront tous les fichiers
     %%% Les threads de parsing envoient leur resultat au port Port
    proc {LaunchThreads Port N}
-        % TODO
+        Fichiers P A
+   in
         
-        thread Data={Reading ListFiles} end
-        thread {Parsing Data Port} end
-        thread {CreerArbre Port N} end
-      skip
+        Fichiers = {OS.getDir TweetsFolder}
+        
+        thread P = {Reading Fichiers} end
+        thread {Parsing P Port} end
+        
    end
    
    %%% Ajouter vos fonctions et procédures auxiliaires ici
+   
+   proc {ActionFetch}
+      local Var in
+         Var = {Press}
+         case Var.1.1
+         of nil then {OutputText set(1:"/")}
+         [] _ then {OutputText set(1:Var.1.1)}
+         end
+      end
+   end
 
+   
    proc {SeparerLigne Phrase ?R}
-      local Fonction
-      in
       fun {Fonction Chaine Liste Mots}
          case Chaine
          of nil then
-            if Mots/=nil then {Append Liste [Mots]} else Liste end
+            if Mots==nil then Liste else {Append Liste [Mots]} end
          [] Head|Tail then
             case {Char.type Head}
-            of digit then {Fonction Tail Liste {Append Mots [Head]}}
+            of lower then {Fonction Tail Liste {Append Mots [Head]}}
             [] upper then {Fonction Tail Liste {Append Mots [Char.toLower Head]}}
-            [] lower then {Fonction Tail Liste {Append Mots [Head]}}
+            [] digit then {Fonction Tail Liste {Append Mots [Head]}}
             else
-               if Mots/=nil then {Fonction Tail {Append Liste [Mots]} nil}
-               else {Fonction Tail Liste nil}
+               if Mots==nil then {Fonction Tail Liste nil}
+               else {Fonction Tail {Append Liste [Mots]} nil}
                end
             end
          else
@@ -75,35 +102,37 @@ define
    in
       R={Fonction Phrase nil nil}
    end
-
-   fun {Scan Fichier}
-      local Ligne in
-          Ligne = {Fichier getS($)}
-          if Ligne == false then
-              {Fichier close}
-              nil
-          else
-              Ligne|{Scan Fichier}
-          end
-      end
- end
-
+   
+   
+   fun {SavetoTree Stream Tree}
+        case Stream of nil then Tree
+        [] H|T then {Add Tree Stream}
+        end
+   end
+   
    fun {Reading ListFiles}
-      case ListFiles of nil then nil
-      [] H|T then {Scan H}|{Reading T}
-      end
+        case ListFiles of nil then nil
+        [] H|T then {Scan {New TextFile init(name:{String.toAtom {Append "tweets/" H}})}}|{Reading T}
+        end
    end
-
+        
    proc {Parsing String Port}
-      case String of nil then nil
-      [] H|T then {Send Port {SeparerLigne H}} {Parsing T Port}
-      end
+        case String of nil then {Send Port nil}
+        [] H|T then {Send Port {SeparerLigne H}} {Parsing T Port}
+        end
    end
-
-   fun {PrendreLigneN NbeFichier NbeLigne DossierTweet Fichier}
-      {Scan {New FichierTexte init(nom: DossierTweet#"/"#{List.nth Fichier NbeFichier})} NbeLigne}
+   
+   fun {Scan Fichier}
+        local Ligne in
+            Ligne = {Fichier getS($)}
+            if Ligne == false then
+                {Fichier close}
+                nil
+            else
+                Ligne|{Scan Fichier}
+            end
+        end
    end
-
    
    fun {Add Tree List}
         case List
@@ -142,26 +171,7 @@ define
             end
         end
    end
-
-   %% Procédure permettant de créer un arbre à travers le parsing
-
-   proc {CreerArbre Source NThreads ?Resultat}
-      fun{Fonction Source Arbre NThreads Finis}
-         case S
-         of Head|Tail then
-            if Head/=done then
-               {Fonction Tail {Add2 Arbre Head} NThreads Finis}
-            else
-               if Finis/= NThreads then {Fonction Tail Arbre NThreads Finis+1}
-               elseif Finis==NThreads then Arbre
-               end
-            end
-         end
-      end
-   in
-      Resultat={Fonction Source Tree NThreads-1 0}
-   end
-      
+   
    fun {Toatom Word}
         if {Atom.is Word} then Word
         else {String.toAtom Word}
@@ -173,7 +183,7 @@ define
       of leaf then Acc
       [] tree(key:K value:V T1 T2) then
             local A B C in
-                A = {List.append Acc [K#V]}
+                A = {List.append Acc [[[K] V]]}
                 B = {Search3 T1 A}
                 C = {Search3 T2 B}
                 C
@@ -185,7 +195,7 @@ define
         case T
         of leaf then notfound
         [] tree(key:Y value:V T1 T2) andthen K==Y then
-            found(V)
+            V
         [] tree(key:Y value:V T1 T2) andthen K<Y then
             {Lookup K T1}
         [] tree(key:Y value:V T1 T2) andthen K>Y then
@@ -212,7 +222,7 @@ define
             if {String.toInt {VirtualString.toString H.2.1}} > {String.toInt {VirtualString.toString Acc.2.1}} then   %%% modifiable???
                 {Prediction T H}
             elseif {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
-                {Prediction T [{List.append Acc.1 [H.1]} H.2.1]}                                                        %%% verifier que ca fonctionne
+                {Prediction T [{List.append Acc.1 [H.1.1]} H.2.1]}
             else
                 {Prediction T Acc}
             end
@@ -221,10 +231,11 @@ define
    
    fun {GetLastMots Phrase}
         case Phrase of nil then nil
-        [] Mot1|Mot2|nil then Mot1|Mot2
+        [] Mot1|Mot2|nil then Mot1|Mot2|nil
         [] H|T then {GetLastMots T}
         end
    end
+   
 
    %%% Fetch Tweets Folder from CLI Arguments
    %%% See the Makefile for an example of how it is called
@@ -251,20 +262,24 @@ define
       %% se trouvant dans le dossier
       %%% N'appelez PAS cette fonction lors de la phase de
       %%% soumission !!!
-      % {ListAllFiles {OS.getDir TweetsFolder}}
+      %{ListAllFiles {OS.getDir TweetsFolder}}
+      
+      %%{Browse {Scan {New TextFile init(name: tweets/part_1.txt)}}}
+      %%{Browse {Scan {New TextFile init(name:{String.toAtom {Append "tweets/" part_1.txt}})}}}
        
-      local NbThreads InputText OutputText Description Window SeparatedWordsStream SeparatedWordsPort in
+      local NbThreads Description Window SeparatedWordsStream SeparatedWordsPort in
 	 {Property.put print foo(width:1000 depth:1000)}  % for stdout siz
 	 
             % TODO
 	 
             % Creation de l interface graphique
 	 Description=td(
-			title: "Text predictor"
-			lr(text(handle:InputText width:50 height:10 background:blue foreground:white wrap:word) button(text:"Predict" width:15 action:Press))
-			text(handle:OutputText width:50 height:10 background:black foreground:white glue:w wrap:word)
-			action:proc{$}{Application.exit 0} end % quitte le programme quand la fenetre est fermee
-			)
+            title: "Text predictor"
+            lr(text(handle:InputText width:50 height:10 background:lightgray foreground:black wrap:word)
+            button(text:"Predict" width:15 background:lightblue foreground:black action:ActionFetch))
+            text(handle:OutputText width:50 height:10 background:lightgray foreground:black glue:w wrap:word)
+            action:proc{$}{Application.exit 0} end % quitte le programme quand la fenetre est fermee
+            )
 	 
             % Creation de la fenetre
 	 Window={QTk.build Description}
@@ -278,6 +293,9 @@ define
 	 NbThreads = 4
 	 {LaunchThreads SeparatedWordsPort NbThreads}
 	 
+     Arbre = {SavetoTree SeparatedWordsStream leaf}
+     
+     
 	 {InputText set(1:"")}
       end
    end
