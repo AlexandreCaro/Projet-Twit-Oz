@@ -51,3 +51,26 @@ fun {Prediction Liste Acc}
 
 R = {Prediction [[[maison] 2] [[congress] 3] [[poule] 1] [[you] 4] [[are] 4] [[test] 2]] [[nil] 0]}
 {Browse [{List.map R.1 VirtualString.toAtom} R.2.1]}
+
+fun {Search3 Tree Acc}
+      case Tree
+      of leaf then Acc
+      [] tree(key:K value:V T1 T2) then
+            local A B C in
+                A = {List.append Acc [[[K] V]]}
+                B = {Search3 T1 A}
+                C = {Search3 T2 B}
+                C
+            end
+      end
+end
+
+Tree = tree(key:horse value:1
+       tree(key:dog value:2
+	    tree(key:cat value:1 leaf leaf)
+	    tree(key:elephant value:4 leaf leaf))
+       tree(key:mouse value:5
+	    tree(key:monkey value:3 leaf leaf)
+	    tree(key:tiger value:5 leaf leaf)))
+
+{Browse {Prediction {Search3 Tree nil} [[nil] 0]}}
