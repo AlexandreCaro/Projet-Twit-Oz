@@ -37,6 +37,8 @@ define
    fun {Press}
       local Var Predic in
          Var = {GetLastMots {InputText getText(p(1 0) 'end' $)}}
+         %{Browse {InputText getText(p(1 0) 'end' $)}}
+         %{Browse Var}
          case Var
          of [Word NextWord] then
             Predic = {Lookup NextWord {Lookup Word Arbre}}
@@ -46,8 +48,9 @@ define
          of leaf then [[nil] 0]
          [] _ then
             local R in
-               R = {Prediction {Search3 Predic nil} [nil 0]}
-               [{List.map R.1 VirtualString.toAtom} R.2.1]
+               R = {Prediction {Search3 Predic nil} [[nil] 0]}
+               R
+               %[{List.map R.1 VirtualString.toAtom} R.2.1]
             end
          end
       end
@@ -105,19 +108,23 @@ define
    
    
    fun {SavetoTree Stream Tree}
-        case Stream of nil then Tree
-        [] H|T then {Add Tree Stream}
+        case Stream of
+        H|T then
+            if H == termine then
+                Tree
+            else {SavetoTree T {Add Tree H}}
+            end
         end
    end
    
    fun {Reading ListFiles}
         case ListFiles of nil then nil
-        [] H|T then {Scan {New TextFile init(name:{String.toAtom {Append "tweets/" H}})}}|{Reading T}
+        [] H|T then {Scan {New TextFile init(name:{Append {Append {GetSentenceFolder} "/"} H})}}|{Reading T}
         end
    end
         
    proc {Parsing String Port}
-        case String of nil then {Send Port nil}
+        case String of nil then {Send Port termine}
         [] H|T then {Send Port {SeparerLigne H}} {Parsing T Port}
         end
    end
@@ -148,22 +155,22 @@ define
         local Lookup1 Lookup2 Lookup3 Insert123 Insert23 Insert3 Upfreq3 in
             Lookup1 = {Lookup Mot1 Tree}
             case Lookup1
-            of notfound then
+            of leaf then
                 Insert123 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} leaf} Tree}
                 Insert123
             [] tree(key:K value :V T1 T2) then
                 Lookup2 = {Lookup Mot2 Lookup1}
                 case Lookup2
-                of notfound then
+                of leaf then
                     Insert23 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} Lookup1} Tree}
                     Insert23
                 [] tree(key:K value :V T1 T2) then
                     Lookup3 = {Lookup Mot3 Lookup2}
                     case Lookup3
-                    of notfound then
+                    of leaf then
                         Insert3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 Lookup2} Lookup1} Tree}
                         Insert3
-                    [] tree(key:K value :V T1 T2) then
+                    [] _ then
                         Upfreq3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 {String.toInt {VirtualString.toString Lookup3}}+1 Lookup2} Lookup1} Tree} %%% modifiable???
                         Upfreq3
                     end
@@ -193,7 +200,7 @@ define
 
    fun {Lookup K T}
         case T
-        of leaf then notfound
+        of leaf then leaf
         [] tree(key:Y value:V T1 T2) andthen K==Y then
             V
         [] tree(key:Y value:V T1 T2) andthen K<Y then
@@ -230,8 +237,11 @@ define
    end
    
    fun {GetLastMots Phrase}
-        case Phrase of nil then nil
-        [] Mot1|Mot2|nil then Mot1|Mot2|nil
+        Sentence
+   in
+        Sentence = {SeparerLigne Phrase}
+        case Sentence of nil then nil
+        [] Mot1|Mot2|nil then [{String.toAtom Mot1} {String.toAtom Mot2}]
         [] H|T then {GetLastMots T}
         end
    end
