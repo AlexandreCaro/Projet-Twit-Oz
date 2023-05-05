@@ -8,16 +8,17 @@ import
    Property
    Browser
 define
-   %% Variables globales
-   Data Tree
-
+   Arbre
+   TweetsFolder
+   InputText
+   OutputText
+   SeparatedWordsStream
+   
+   
    %%% Pour ouvrir les fichiers
    class TextFile
       from Open.file Open.text
    end
-
-
-
 
    proc {Browse Buf}
       {Browser.browse Buf}
@@ -35,37 +36,67 @@ define
    %%%                                           | nil
    %%%                  <probability/frequence> := <int> | <float>
    fun {Press}
-      0
+      local Var Predic in
+         Var = {GetLastMots {SeparerLigne {InputText getText(p(1 0) 'end' $)}}}
+         %{Browse {InputText getText(p(1 0) 'end' $)}}
+         %{Browse Var}
+         case Var
+         of [Word NextWord] then
+            Predic = {Lookup Var.2.1 {Lookup Var.1 Arbre}}
+         [] _ then Predic = leaf
+         end
+         case Predic
+         of leaf then [[nil] 0]
+         [] _ then
+            local R in
+               R = {Prediction {Search3 Predic nil} [[nil] 0]}
+               R
+               %[{List.map R.1 VirtualString.toAtom} R.2.1]
+            end
+         end
+      end
    end
+
    
     %%% Lance les N threads de lecture et de parsing qui liront et traiteront tous les fichiers
     %%% Les threads de parsing envoient leur resultat au port Port
    proc {LaunchThreads Port N}
-        % TODO
+        Fichiers P
+   in
+        TweetsFolder = {GetSentenceFolder}
+        Fichiers = {OS.getDir TweetsFolder}
         
-        thread Data={Reading ListFiles} end
-        thread {Parsing Data Port} end
-        thread {CreerArbre Port N} end
-      skip
+        thread P = {Reading Fichiers} end
+        thread {Parsing P Port} end
+        
    end
    
    %%% Ajouter vos fonctions et procédures auxiliaires ici
+   
+   proc {ActionFetch}
+      local Var in
+         Var = {Press}
+         case Var.1.1
+         of nil then {OutputText set(1:"/")}
+         [] _ then {OutputText set(1:Var.1.1)}
+         end
+      end
+   end
 
+   
    proc {SeparerLigne Phrase ?R}
-      local Fonction
-      in
       fun {Fonction Chaine Liste Mots}
          case Chaine
          of nil then
-            if Mots/=nil then {Append Liste [Mots]} else Liste end
+            if Mots==nil then Liste else {Append Liste [Mots]} end
          [] Head|Tail then
             case {Char.type Head}
-            of digit then {Fonction Tail Liste {Append Mots [Head]}}
-            [] upper then {Fonction Tail Liste {Append Mots [Char.toLower Head]}}
-            [] lower then {Fonction Tail Liste {Append Mots [Head]}}
+            of lower then {Fonction Tail Liste {Append Mots [Head]}}
+            [] upper then {Fonction Tail Liste {Append Mots [{Char.toLower Head}]}}
+            [] digit then {Fonction Tail Liste {Append Mots [Head]}}
             else
-               if Mots/=nil then {Fonction Tail {Append Liste [Mots]} nil}
-               else {Fonction Tail Liste nil}
+               if Mots==nil then {Fonction Tail Liste nil}
+               else {Fonction Tail {Append Liste [Mots]} nil}
                end
             end
          else
@@ -75,35 +106,46 @@ define
    in
       R={Fonction Phrase nil nil}
    end
-
-   fun {Scan Fichier}
-      local Ligne in
-          Ligne = {Fichier getS($)}
-          if Ligne == false then
-              {Fichier close}
-              nil
-          else
-              Ligne|{Scan Fichier}
-          end
-      end
- end
-
+   
+   fun {SeparerLigne2 Phrases Acc}
+        case Phrases of nil then Acc
+        [] H|T then {SeparerLigne2 T {Append Acc {SeparerLigne H}}}
+        end
+   end
+   
+   fun {SavetoTree Stream Tree}
+        case Stream of
+        H|T then
+            if H == termine then
+                Tree
+            else {SavetoTree T {Add Tree H}}
+            end
+        end
+   end
+   
    fun {Reading ListFiles}
-      case ListFiles of nil then nil
-      [] H|T then {Scan H}|{Reading T}
-      end
+        case ListFiles of nil then nil
+        [] H|T then {Scan {New TextFile init(name:{Append {Append {GetSentenceFolder} "/"} H})}}|{Reading T}
+        end
    end
-
+        
    proc {Parsing String Port}
-      case String of nil then nil
-      [] H|T then {Send Port {SeparerLigne H}} {Parsing T Port}
-      end
+        case String of nil then {Send Port termine}
+        [] H|T then {Send Port {SeparerLigne2 H nil}} {Parsing T Port}
+        end
    end
-
-   fun {PrendreLigneN NbeFichier NbeLigne DossierTweet Fichier}
-      {Scan {New FichierTexte init(nom: DossierTweet#"/"#{List.nth Fichier NbeFichier})} NbeLigne}
+   
+   fun {Scan Fichier}
+        local Ligne in
+            Ligne = {Fichier getS($)}
+            if Ligne == false then
+                {Fichier close}
+                nil
+            else
+                Ligne|{Scan Fichier}
+            end
+        end
    end
-
    
    fun {Add Tree List}
         case List
@@ -112,29 +154,31 @@ define
         end
    end
    
-   fun {Add2 Tree Mot1 Mot2 Mot3}
-        Mot1 = {Toatom Mot1}
-        Mot2 = {Toatom Mot2}
-        Mot3 = {Toatom Mot3}
+   fun {Add2 Tree Mot1a Mot2a Mot3a}
+        Mot1 Mot2 Mot3
+   in
+        Mot1 = {Toatom Mot1a}
+        Mot2 = {Toatom Mot2a}
+        Mot3 = {Toatom Mot3a}
         local Lookup1 Lookup2 Lookup3 Insert123 Insert23 Insert3 Upfreq3 in
             Lookup1 = {Lookup Mot1 Tree}
             case Lookup1
-            of notfound then
+            of leaf then
                 Insert123 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} leaf} Tree}
                 Insert123
             [] tree(key:K value :V T1 T2) then
                 Lookup2 = {Lookup Mot2 Lookup1}
                 case Lookup2
-                of notfound then
+                of leaf then
                     Insert23 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 leaf} Lookup1} Tree}
                     Insert23
                 [] tree(key:K value :V T1 T2) then
                     Lookup3 = {Lookup Mot3 Lookup2}
                     case Lookup3
-                    of notfound then
+                    of leaf then
                         Insert3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 1 Lookup2} Lookup1} Tree}
                         Insert3
-                    [] tree(key:K value :V T1 T2) then
+                    [] _ then
                         Upfreq3 = {Insert Mot1 {Insert Mot2 {Insert Mot3 {String.toInt {VirtualString.toString Lookup3}}+1 Lookup2} Lookup1} Tree} %%% modifiable???
                         Upfreq3
                     end
@@ -142,26 +186,7 @@ define
             end
         end
    end
-
-   %% Procédure permettant de créer un arbre à travers le parsing
-
-   proc {CreerArbre Source NThreads ?Resultat}
-      fun{Fonction Source Arbre NThreads Finis}
-         case S
-         of Head|Tail then
-            if Head/=done then
-               {Fonction Tail {Add2 Arbre Head} NThreads Finis}
-            else
-               if Finis/= NThreads then {Fonction Tail Arbre NThreads Finis+1}
-               elseif Finis==NThreads then Arbre
-               end
-            end
-         end
-      end
-   in
-      Resultat={Fonction Source Tree NThreads-1 0}
-   end
-      
+   
    fun {Toatom Word}
         if {Atom.is Word} then Word
         else {String.toAtom Word}
@@ -173,7 +198,7 @@ define
       of leaf then Acc
       [] tree(key:K value:V T1 T2) then
             local A B C in
-                A = {List.append Acc [K#V]}
+                A = {List.append Acc [[[K] V]]}
                 B = {Search3 T1 A}
                 C = {Search3 T2 B}
                 C
@@ -183,9 +208,9 @@ define
 
    fun {Lookup K T}
         case T
-        of leaf then notfound
+        of leaf then leaf
         [] tree(key:Y value:V T1 T2) andthen K==Y then
-            found(V)
+            V
         [] tree(key:Y value:V T1 T2) andthen K<Y then
             {Lookup K T1}
         [] tree(key:Y value:V T1 T2) andthen K>Y then
@@ -212,7 +237,7 @@ define
             if {String.toInt {VirtualString.toString H.2.1}} > {String.toInt {VirtualString.toString Acc.2.1}} then   %%% modifiable???
                 {Prediction T H}
             elseif {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
-                {Prediction T [{List.append Acc.1 [H.1]} H.2.1]}                                                        %%% verifier que ca fonctionne
+                {Prediction T [{List.append Acc.1 [H.1.1]} H.2.1]}
             else
                 {Prediction T Acc}
             end
@@ -220,11 +245,15 @@ define
    end
    
    fun {GetLastMots Phrase}
+        %Sentence
+   %in
+        %Sentence = {SeparerLigne Phrase}
         case Phrase of nil then nil
-        [] Mot1|Mot2|nil then Mot1|Mot2
+        [] Mot1|Mot2|nil then [{String.toAtom Mot1} {String.toAtom Mot2}]
         [] H|T then {GetLastMots T}
         end
    end
+   
 
    %%% Fetch Tweets Folder from CLI Arguments
    %%% See the Makefile for an example of how it is called
@@ -236,9 +265,9 @@ define
 
    %%% Decomnentez moi si besoin
    %proc {ListAllFiles L}
-   %   case L of nil then skip
-   %   [] H|T then {Browse {String.toAtom H}} {ListAllFiles T}
-   %   end
+      %case L of nil then skip
+      %[] H|T then {Browse H} %{ListAllFiles T}   %%{String.toAtom H}
+      %end
    %end
     
    %%% Procedure principale qui cree la fenetre et appelle les differentes procedures et fonctions
@@ -251,33 +280,54 @@ define
       %% se trouvant dans le dossier
       %%% N'appelez PAS cette fonction lors de la phase de
       %%% soumission !!!
-      % {ListAllFiles {OS.getDir TweetsFolder}}
+      %{ListAllFiles {OS.getDir TweetsFolder}}
+      
+      %{Browse {OS.getDir TweetsFolder}}
+      
+      %%{Browse {Scan {New TextFile init(name: tweets/part_1.txt)}}}
+      %%{Browse {Scan {New TextFile init(name:{Append {Append {GetSentenceFolder} "/"} part_1.txt})}}}
+      
+      %local
+        %Liste = [112 97 114 116 95 50 57 46 116 120 116]
+        %FileName = {Append {Append {GetSentenceFolder} "/"} Liste}
+        %File = {New TextFile init(name: FileName)}
+        %Contents = {Scan File}
+      %in
+        %{Browse Contents}
+      %end
+      
+      %{Browse {Reading {OS.getDir TweetsFolder}}}
        
-      local NbThreads InputText OutputText Description Window SeparatedWordsStream SeparatedWordsPort in
+      local NbThreads Description Window SeparatedWordsPort in
 	 {Property.put print foo(width:1000 depth:1000)}  % for stdout siz
 	 
             % TODO
 	 
             % Creation de l interface graphique
 	 Description=td(
-			title: "Text predictor"
-			lr(text(handle:InputText width:50 height:10 background:blue foreground:white wrap:word) button(text:"Predict" width:15 action:Press))
-			text(handle:OutputText width:50 height:10 background:black foreground:white glue:w wrap:word)
-			action:proc{$}{Application.exit 0} end % quitte le programme quand la fenetre est fermee
-			)
+            title: "Text predictor"
+            lr(text(handle:InputText width:50 height:10 background:lightgray foreground:black wrap:word)
+            button(text:"Predict" width:15 background:lightblue foreground:black action:ActionFetch))
+            text(handle:OutputText width:50 height:10 background:lightgray foreground:black glue:w wrap:word)
+            action:proc{$}{Application.exit 0} end % quitte le programme quand la fenetre est fermee
+            )
 	 
             % Creation de la fenetre
 	 Window={QTk.build Description}
 	 {Window show}
 	 
 	 {InputText tk(insert 'end' "Loading... Please wait.")}
-	 {InputText bind(event:"<Control-s>" action:Press)} % You can also bind events
+	 {InputText bind(event:"<Control-s>" action:ActionFetch)} % Press??
 	 
             % On lance les threads de lecture et de parsing
 	 SeparatedWordsPort = {NewPort SeparatedWordsStream}
 	 NbThreads = 4
 	 {LaunchThreads SeparatedWordsPort NbThreads}
 	 
+     Arbre = {SavetoTree SeparatedWordsStream leaf}
+     %{Browse Arbre}
+     
+     
 	 {InputText set(1:"")}
       end
    end
