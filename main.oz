@@ -12,6 +12,7 @@ define
    TweetsFolder
    InputText
    OutputText
+   SeparatedWordsStream
    
    
    %%% Pour ouvrir les fichiers
@@ -36,12 +37,12 @@ define
    %%%                  <probability/frequence> := <int> | <float>
    fun {Press}
       local Var Predic in
-         Var = {GetLastMots {InputText getText(p(1 0) 'end' $)}}
+         Var = {GetLastMots {SeparerLigne {InputText getText(p(1 0) 'end' $)}}}
          %{Browse {InputText getText(p(1 0) 'end' $)}}
          %{Browse Var}
          case Var
          of [Word NextWord] then
-            Predic = {Lookup NextWord {Lookup Word Arbre}}
+            Predic = {Lookup Var.2.1 {Lookup Var.1 Arbre}}
          [] _ then Predic = leaf
          end
          case Predic
@@ -60,9 +61,9 @@ define
     %%% Lance les N threads de lecture et de parsing qui liront et traiteront tous les fichiers
     %%% Les threads de parsing envoient leur resultat au port Port
    proc {LaunchThreads Port N}
-        Fichiers P A
+        Fichiers P
    in
-        
+        TweetsFolder = {GetSentenceFolder}
         Fichiers = {OS.getDir TweetsFolder}
         
         thread P = {Reading Fichiers} end
@@ -91,7 +92,7 @@ define
          [] Head|Tail then
             case {Char.type Head}
             of lower then {Fonction Tail Liste {Append Mots [Head]}}
-            [] upper then {Fonction Tail Liste {Append Mots [Char.toLower Head]}}
+            [] upper then {Fonction Tail Liste {Append Mots [{Char.toLower Head}]}}
             [] digit then {Fonction Tail Liste {Append Mots [Head]}}
             else
                if Mots==nil then {Fonction Tail Liste nil}
@@ -106,6 +107,11 @@ define
       R={Fonction Phrase nil nil}
    end
    
+   fun {SeparerLigne2 Phrases Acc}
+        case Phrases of nil then Acc
+        [] H|T then {SeparerLigne2 T {Append Acc {SeparerLigne H}}}
+        end
+   end
    
    fun {SavetoTree Stream Tree}
         case Stream of
@@ -125,7 +131,7 @@ define
         
    proc {Parsing String Port}
         case String of nil then {Send Port termine}
-        [] H|T then {Send Port {SeparerLigne H}} {Parsing T Port}
+        [] H|T then {Send Port {SeparerLigne2 H nil}} {Parsing T Port}
         end
    end
    
@@ -148,10 +154,12 @@ define
         end
    end
    
-   fun {Add2 Tree Mot1 Mot2 Mot3}
-        Mot1 = {Toatom Mot1}
-        Mot2 = {Toatom Mot2}
-        Mot3 = {Toatom Mot3}
+   fun {Add2 Tree Mot1a Mot2a Mot3a}
+        Mot1 Mot2 Mot3
+   in
+        Mot1 = {Toatom Mot1a}
+        Mot2 = {Toatom Mot2a}
+        Mot3 = {Toatom Mot3a}
         local Lookup1 Lookup2 Lookup3 Insert123 Insert23 Insert3 Upfreq3 in
             Lookup1 = {Lookup Mot1 Tree}
             case Lookup1
@@ -237,10 +245,10 @@ define
    end
    
    fun {GetLastMots Phrase}
-        Sentence
-   in
-        Sentence = {SeparerLigne Phrase}
-        case Sentence of nil then nil
+        %Sentence
+   %in
+        %Sentence = {SeparerLigne Phrase}
+        case Phrase of nil then nil
         [] Mot1|Mot2|nil then [{String.toAtom Mot1} {String.toAtom Mot2}]
         [] H|T then {GetLastMots T}
         end
@@ -257,9 +265,9 @@ define
 
    %%% Decomnentez moi si besoin
    %proc {ListAllFiles L}
-   %   case L of nil then skip
-   %   [] H|T then {Browse {String.toAtom H}} {ListAllFiles T}
-   %   end
+      %case L of nil then skip
+      %[] H|T then {Browse H} %{ListAllFiles T}   %%{String.toAtom H}
+      %end
    %end
     
    %%% Procedure principale qui cree la fenetre et appelle les differentes procedures et fonctions
@@ -274,10 +282,23 @@ define
       %%% soumission !!!
       %{ListAllFiles {OS.getDir TweetsFolder}}
       
+      %{Browse {OS.getDir TweetsFolder}}
+      
       %%{Browse {Scan {New TextFile init(name: tweets/part_1.txt)}}}
-      %%{Browse {Scan {New TextFile init(name:{String.toAtom {Append "tweets/" part_1.txt}})}}}
+      %%{Browse {Scan {New TextFile init(name:{Append {Append {GetSentenceFolder} "/"} part_1.txt})}}}
+      
+      %local
+        %Liste = [112 97 114 116 95 50 57 46 116 120 116]
+        %FileName = {Append {Append {GetSentenceFolder} "/"} Liste}
+        %File = {New TextFile init(name: FileName)}
+        %Contents = {Scan File}
+      %in
+        %{Browse Contents}
+      %end
+      
+      %{Browse {Reading {OS.getDir TweetsFolder}}}
        
-      local NbThreads Description Window SeparatedWordsStream SeparatedWordsPort in
+      local NbThreads Description Window SeparatedWordsPort in
 	 {Property.put print foo(width:1000 depth:1000)}  % for stdout siz
 	 
             % TODO
@@ -296,7 +317,7 @@ define
 	 {Window show}
 	 
 	 {InputText tk(insert 'end' "Loading... Please wait.")}
-	 {InputText bind(event:"<Control-s>" action:Press)} % You can also bind events
+	 {InputText bind(event:"<Control-s>" action:ActionFetch)} % Press??
 	 
             % On lance les threads de lecture et de parsing
 	 SeparatedWordsPort = {NewPort SeparatedWordsStream}
@@ -304,6 +325,7 @@ define
 	 {LaunchThreads SeparatedWordsPort NbThreads}
 	 
      Arbre = {SavetoTree SeparatedWordsStream leaf}
+     %{Browse Arbre}
      
      
 	 {InputText set(1:"")}
