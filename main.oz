@@ -35,26 +35,16 @@ define
    %%%                  <most_probable_words> := <atom> '|' <most_probable_words> 
    %%%                                           | nil
    %%%                  <probability/frequence> := <int> | <float>
+   
    fun {Press}
-      local Var Predic in
-         Var = {GetLastMots {SeparerLigne {InputText getText(p(1 0) 'end' $)}}}
-         %{Browse {InputText getText(p(1 0) 'end' $)}}
-         %{Browse Var}
-         case Var
-         of [Word NextWord] then
-            Predic = {Lookup Var.2.1 {Lookup Var.1 Arbre}}
-         [] _ then Predic = leaf
-         end
-         case Predic
-         of leaf then [[nil] 0]
-         [] _ then
-            local R in
-               R = {Prediction {Search3 Predic nil} [[nil] 0]}
-               R
-               %[{List.map R.1 VirtualString.toAtom} R.2.1]
+        local Mots Predic in
+            Mots = {GetLastMots {MakeListeMots {InputText getText(p(1 0) 'end' $)}}}
+            case Mots
+            of [Mot1 Mot2] then
+                {Prediction {Search3 {Lookup Mot2 {Lookup Mot1 Arbre}} nil} [[nil] 0]}
+            [] _ then [[nil] 0]
             end
-         end
-      end
+        end
    end
 
    
@@ -73,43 +63,51 @@ define
    
    %%% Ajouter vos fonctions et procédures auxiliaires ici
    
-   proc {ActionFetch}
-      local Var in
-         Var = {Press}
-         case Var.1.1
-         of nil then {OutputText set(1:"/")}
-         [] _ then {OutputText set(1:Var.1.1)}
-         end
-      end
-   end
-
-   
-   proc {SeparerLigne Phrase ?R}
-      fun {Fonction Chaine Liste Mots}
-         case Chaine
-         of nil then
-            if Mots==nil then Liste else {Append Liste [Mots]} end
-         [] Head|Tail then
-            case {Char.type Head}
-            of lower then {Fonction Tail Liste {Append Mots [Head]}}
-            [] upper then {Fonction Tail Liste {Append Mots [{Char.toLower Head}]}}
-            [] digit then {Fonction Tail Liste {Append Mots [Head]}}
-            else
-               if Mots==nil then {Fonction Tail Liste nil}
-               else {Fonction Tail {Append Liste [Mots]} nil}
-               end
-            end
-         else
-            nil
-         end
-      end
+   proc {Press2}
+        Predic Prediction
    in
-      R={Fonction Phrase nil nil}
+        Predic = {Press}
+        Prediction = Predic.1.1
+        case Prediction
+        of nil then {OutputText set(1:"Sorry, we could not find the next word of your phrase.\nTry to:\n\n 1- Input at least one word\n\n 2- Use English\n\n 3- Make sure you did not misspell any word")}
+        [] _ then {OutputText set(1:Prediction)}
+        end
    end
    
-   fun {SeparerLigne2 Phrases Acc}
+   
+   fun {MakeListeMots Phrase}
+        fun {MakeListMots Phrase Liste Mot}
+            case Phrase of nil then
+                if Mot \= nil then
+                    {Append Liste [Mot]}
+                else
+                    Liste
+                end
+            [] H|T then
+                if {Char.type H} == lower then
+                    {MakeListMots T Liste {Append Mot [H]}}
+                elseif {Char.type H} == upper then
+                    {MakeListMots T Liste {Append Mot [{Char.toLower H}]}}
+                elseif {Char.type H} == digit then
+                    {MakeListMots T Liste {Append Mot [H]}}
+                else
+                    if Mot \= nil then
+                        {MakeListMots T {Append Liste [Mot]} nil}
+                    else
+                        {MakeListMots T Liste nil}
+                    end
+                end
+            else
+                nil
+            end
+        end
+   in
+        {MakeListMots Phrase nil nil}
+   end
+   
+   fun {MakeListeMots2 Phrases Acc}
         case Phrases of nil then Acc
-        [] H|T then {SeparerLigne2 T {Append Acc {SeparerLigne H}}}
+        [] H|T then {MakeListeMots2 T {Append Acc {MakeListeMots H}}}
         end
    end
    
@@ -131,7 +129,7 @@ define
         
    proc {Parsing String Port}
         case String of nil then {Send Port termine}
-        [] H|T then {Send Port {SeparerLigne2 H nil}} {Parsing T Port}
+        [] H|T then {Send Port {MakeListeMots2 H nil}} {Parsing T Port}
         end
    end
    
@@ -205,7 +203,7 @@ define
             end
       end
    end
-
+   
    fun {Lookup K T}
         case T
         of leaf then leaf
@@ -217,7 +215,7 @@ define
             {Lookup K T2}
         end
    end
-
+   
    fun {Insert K W T}
         case T
         of leaf then tree(key:K value:W leaf leaf)
@@ -234,7 +232,7 @@ define
         case Liste
         of nil then Acc
         [] H|T then
-            if {String.toInt {VirtualString.toString H.2.1}} > {String.toInt {VirtualString.toString Acc.2.1}} then   %%% modifiable???
+            if {String.toInt {VirtualString.toString H.2.1}} > {String.toInt {VirtualString.toString Acc.2.1}} then
                 {Prediction T H}
             elseif {String.toInt {VirtualString.toString H.2.1}} == {String.toInt {VirtualString.toString Acc.2.1}} then
                 {Prediction T [{List.append Acc.1 [H.1.1]} H.2.1]}
@@ -254,7 +252,6 @@ define
         end
    end
    
-
    %%% Fetch Tweets Folder from CLI Arguments
    %%% See the Makefile for an example of how it is called
    fun {GetSentenceFolder}
@@ -262,7 +259,7 @@ define
    in
       Args.'folder'
    end
-
+   
    %%% Decomnentez moi si besoin
    %proc {ListAllFiles L}
       %case L of nil then skip
@@ -307,7 +304,7 @@ define
 	 Description=td(
             title: "Text predictor"
             lr(text(handle:InputText width:50 height:10 background:lightgray foreground:black wrap:word)
-            button(text:"Predict" width:15 background:lightblue foreground:black action:ActionFetch))
+            button(text:"Predict" width:15 background:lightblue foreground:black action:Press2))
             text(handle:OutputText width:50 height:10 background:lightgray foreground:black glue:w wrap:word)
             action:proc{$}{Application.exit 0} end % quitte le programme quand la fenetre est fermee
             )
@@ -317,7 +314,7 @@ define
 	 {Window show}
 	 
 	 {InputText tk(insert 'end' "Loading... Please wait.")}
-	 {InputText bind(event:"<Control-s>" action:ActionFetch)} % Press??
+	 {InputText bind(event:"<Control-s>" action:Press2)} % Press??
 	 
             % On lance les threads de lecture et de parsing
 	 SeparatedWordsPort = {NewPort SeparatedWordsStream}
@@ -330,6 +327,7 @@ define
      
 	 {InputText set(1:"")}
       end
+      %%ENDOFCODE%%
    end
     % Appelle la procedure principale
    {Main}
